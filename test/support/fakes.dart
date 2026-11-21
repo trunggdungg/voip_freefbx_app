@@ -2,7 +2,11 @@ import 'package:voip_freefbx_app/core/network/api_exceptions.dart';
 import 'package:voip_freefbx_app/core/storage/key_value_store.dart';
 import 'package:voip_freefbx_app/features/auth/domain/auth_repository.dart';
 import 'package:voip_freefbx_app/features/auth/domain/auth_session.dart';
+import 'dart:async';
+
 import 'package:voip_freefbx_app/features/sip/data/voip_config_repository.dart';
+import 'package:voip_freefbx_app/features/sip/domain/sip_client.dart';
+import 'package:voip_freefbx_app/features/sip/domain/sip_status.dart';
 import 'package:voip_freefbx_app/features/sip/domain/voip_config.dart';
 
 class MemoryStore implements KeyValueStore {
@@ -81,3 +85,37 @@ VoipConfig sampleConfig({String wss = 'wss://pbx.example.com:8089/ws'}) =>
         displayName: 'Tư vấn viên A',
       ),
     );
+
+/// SipClient giả: ghi lại các lần start/stop, cho test đẩy trạng thái vào.
+class FakeSipClient implements SipClient {
+  final _controller = StreamController<SipStatus>.broadcast();
+  SipStatus _status = const SipStatus.stopped();
+  final List<String> startedUsers = [];
+  int stopCount = 0;
+
+  void push(SipStatus s) {
+    _status = s;
+    _controller.add(s);
+  }
+
+  @override
+  SipStatus get status => _status;
+
+  @override
+  Stream<SipStatus> get statusStream => _controller.stream;
+
+  @override
+  Future<void> start(VoipConfig config) async {
+    startedUsers.add(config.user.username);
+    push(const SipStatus.connecting());
+  }
+
+  @override
+  Future<void> stop() async {
+    stopCount++;
+    push(const SipStatus.stopped());
+  }
+
+  @override
+  Future<void> dispose() async => _controller.close();
+}

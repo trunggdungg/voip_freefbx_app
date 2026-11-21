@@ -4,7 +4,9 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/permissions/permission_service.dart';
 import '../../auth/presentation/auth_controller.dart';
+import '../../sip/domain/sip_status.dart';
 import '../../sip/domain/voip_config.dart';
+import '../../sip/presentation/sip_controller.dart';
 import '../../sip/presentation/voip_config_provider.dart';
 
 /// Màn hình chính tạm thời của M1: hiện tài khoản, cấu hình SIP lấy từ Odoo và quyền.
@@ -16,6 +18,7 @@ class HomePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(authControllerProvider).value;
     final config = ref.watch(voipConfigProvider);
+    final sip = ref.watch(sipControllerProvider);
     final statuses = ref.watch(permissionStatusesProvider);
     final theme = Theme.of(context);
 
@@ -37,9 +40,16 @@ class HomePage extends ConsumerWidget {
             child: ListTile(
               leading: const Icon(Icons.account_circle),
               title: Text(session?.displayName ?? ''),
-              subtitle: Text('${session?.login ?? ''}\n${session?.baseUrl ?? ''}'),
+              subtitle: Text(
+                '${session?.login ?? ''}\n${session?.baseUrl ?? ''}',
+              ),
               isThreeLine: true,
             ),
+          ),
+          const SizedBox(height: 16),
+          _SipStatusCard(
+            status: sip,
+            onRetry: () => ref.read(sipControllerProvider.notifier).reconnect(),
           ),
           const SizedBox(height: 16),
           Text('Cấu hình điện thoại (SIP)', style: theme.textTheme.titleMedium),
@@ -57,9 +67,12 @@ class HomePage extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('$e',
-                        style: TextStyle(
-                            color: theme.colorScheme.onErrorContainer)),
+                    Text(
+                      '$e',
+                      style: TextStyle(
+                        color: theme.colorScheme.onErrorContainer,
+                      ),
+                    ),
                     const SizedBox(height: 8),
                     OutlinedButton(
                       onPressed: () => ref.invalidate(voipConfigProvider),
@@ -89,6 +102,79 @@ class HomePage extends ConsumerWidget {
   }
 }
 
+class _SipStatusCard extends StatelessWidget {
+  const _SipStatusCard({required this.status, required this.onRetry});
+
+  final SipStatus status;
+  final VoidCallback onRetry;
+
+  ({String label, Color color, IconData icon}) _look(ColorScheme scheme) {
+    switch (status.phase) {
+      case SipPhase.registered:
+        return (
+          label: 'Đã đăng ký, sẵn sàng gọi',
+          color: Colors.green,
+          icon: Icons.check_circle,
+        );
+      case SipPhase.connecting:
+        return (
+          label: 'Đang kết nối tổng đài…',
+          color: Colors.orange,
+          icon: Icons.sync,
+        );
+      case SipPhase.registering:
+        return (
+          label: 'Đang đăng ký extension…',
+          color: Colors.orange,
+          icon: Icons.sync,
+        );
+      case SipPhase.disconnected:
+        return (
+          label: 'Mất kết nối, đang thử lại',
+          color: Colors.orange,
+          icon: Icons.cloud_off,
+        );
+      case SipPhase.failed:
+        return (
+          label: 'Không đăng ký được',
+          color: scheme.error,
+          icon: Icons.error,
+        );
+      case SipPhase.unregistered:
+        return (
+          label: 'Chưa đăng ký',
+          color: scheme.error,
+          icon: Icons.phone_disabled,
+        );
+      case SipPhase.stopped:
+        return (
+          label: 'Chưa kết nối',
+          color: scheme.outline,
+          icon: Icons.phone_disabled,
+        );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final look = _look(Theme.of(context).colorScheme);
+    return Card(
+      child: ListTile(
+        leading: Icon(look.icon, color: look.color),
+        title: Text(look.label),
+        subtitle: status.detail == null ? null : Text(status.detail!),
+        isThreeLine: (status.detail?.length ?? 0) > 60,
+        trailing: status.canRetry
+            ? OutlinedButton(
+                onPressed: onRetry,
+                child: const Text('Kết nối lại'),
+              )
+            : null,
+      ),
+    );
+  }
+}
+
 class _ConfigCard extends StatelessWidget {
   const _ConfigCard({required this.config});
 
@@ -101,18 +187,18 @@ class _ConfigCard extends StatelessWidget {
     final user = config.user;
 
     Widget row(String label, String value) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 2),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                width: 110,
-                child: Text(label, style: theme.textTheme.bodySmall),
-              ),
-              Expanded(child: Text(value)),
-            ],
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 110,
+            child: Text(label, style: theme.textTheme.bodySmall),
           ),
-        );
+          Expanded(child: Text(value)),
+        ],
+      ),
+    );
 
     return Card(
       child: Padding(

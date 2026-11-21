@@ -13,7 +13,9 @@ final voipConfigProvider = FutureProvider.autoDispose<VoipConfig>((ref) async {
     return await ref.watch(voipConfigRepositoryProvider).fetch();
   } on SessionExpiredException {
     // Phiên hết hạn: đưa về màn đăng nhập.
-    Future.microtask(() => ref.read(authControllerProvider.notifier).sessionExpired());
+    Future.microtask(
+      () => ref.read(authControllerProvider.notifier).sessionExpired(),
+    );
     rethrow;
   }
 });

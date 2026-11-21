@@ -65,9 +65,7 @@ class OdooClient {
           'id': ++_requestId,
         },
         options: Options(
-          headers: {
-            if (_sessionId != null) 'Cookie': 'session_id=$_sessionId',
-          },
+          headers: {if (_sessionId != null) 'Cookie': 'session_id=$_sessionId'},
         ),
       );
       _captureSession(res);
@@ -110,7 +108,9 @@ class OdooClient {
     }
     if (message.toLowerCase().contains('database') &&
         message.toLowerCase().contains('not')) {
-      return const ApiException('Không tìm thấy database này trên máy chủ Odoo.');
+      return const ApiException(
+        'Không tìm thấy database này trên máy chủ Odoo.',
+      );
     }
     return ApiException(
       message.isEmpty ? 'Máy chủ Odoo báo lỗi không rõ nguyên nhân.' : message,
