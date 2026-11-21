@@ -3,7 +3,14 @@
 App Android gọi VoIP cho tư vấn tuyển sinh: đăng nhập bằng tài khoản Odoo, lấy cấu hình SIP
 từ Odoo (module `voip_webrtc_freepbx`) và đăng ký extension qua WSS tới FreePBX.
 
-Tiến độ: **M0 – khung dự án** (xem kế hoạch M0 → M5 trong phiên làm việc).
+Tiến độ: **M0** khung dự án ✔ · **M1** đăng nhập Odoo + lấy cấu hình SIP ✔ · M2 đăng ký SIP (tiếp theo).
+
+## Đăng nhập (M1)
+App dùng endpoint sẵn có của Odoo: `POST /web/session/authenticate` (cookie `session_id`) và
+`POST /voip/config`. Chỉ lưu địa chỉ, database, tên đăng nhập và session trong secure storage;
+**mật khẩu Odoo và mật khẩu SIP không được lưu**, cấu hình SIP chỉ nằm trong bộ nhớ.
+
+Địa chỉ Odoo khi test: máy ảo Android dùng `http://10.0.2.2:8069`, điện thoại thật dùng IP LAN.
 
 ## Yêu cầu
 - Flutter 3.38.x (Dart 3.10), Android SDK, JDK 17
