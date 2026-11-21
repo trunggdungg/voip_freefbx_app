@@ -48,7 +48,12 @@ class CallPage extends ConsumerWidget {
                 const SizedBox(height: 8),
                 _CallStatusText(call: call),
                 const Spacer(),
-                if (!call.isTerminal) ...[
+                if (call.isIncomingRinging)
+                  _IncomingActions(
+                    onAnswer: () => _answer(context, controller),
+                    onReject: controller.reject,
+                  )
+                else if (!call.isTerminal) ...[
                   Wrap(
                     spacing: 28,
                     runSpacing: 20,
@@ -101,6 +106,18 @@ class CallPage extends ConsumerWidget {
     );
   }
 
+  Future<void> _answer(BuildContext context, CallController controller) async {
+    try {
+      await controller.answer();
+    } on CallException catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    }
+  }
+
   void _showKeypad(BuildContext context, CallController controller) {
     showModalBottomSheet<void>(
       context: context,
@@ -108,6 +125,54 @@ class CallPage extends ConsumerWidget {
         padding: const EdgeInsets.all(24),
         child: DialPad(onKey: controller.sendDtmf),
       ),
+    );
+  }
+}
+
+/// Hai nút lớn khi có cuộc gọi đến: Từ chối (đỏ) và Trả lời (xanh).
+class _IncomingActions extends StatelessWidget {
+  const _IncomingActions({required this.onAnswer, required this.onReject});
+
+  final VoidCallback onAnswer;
+  final VoidCallback onReject;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            FloatingActionButton.large(
+              heroTag: 'call-reject',
+              tooltip: 'Từ chối',
+              backgroundColor: theme.colorScheme.error,
+              foregroundColor: theme.colorScheme.onError,
+              onPressed: onReject,
+              child: const Icon(Icons.call_end),
+            ),
+            const SizedBox(height: 8),
+            const Text('Từ chối'),
+          ],
+        ),
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            FloatingActionButton.large(
+              heroTag: 'call-answer',
+              tooltip: 'Trả lời',
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+              onPressed: onAnswer,
+              child: const Icon(Icons.call),
+            ),
+            const SizedBox(height: 8),
+            const Text('Trả lời'),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -212,12 +277,15 @@ class _CallStatusTextState extends State<_CallStatusText> {
       case CallPhase.dialing:
         text = 'Đang gọi…';
       case CallPhase.ringing:
-        text = 'Đổ chuông…';
+        text = call.direction == CallDirection.incoming
+            ? 'Cuộc gọi đến…'
+            : 'Đổ chuông…';
       case CallPhase.active:
         text = call.held
             ? 'Đang giữ máy · ${_fmt(duration ?? Duration.zero)}'
             : _fmt(duration ?? Duration.zero);
       case CallPhase.ended:
+        if (call.missed) color = scheme.error;
         text = duration == null
             ? (call.endDetail ?? 'Cuộc gọi kết thúc')
             : 'Cuộc gọi kết thúc · ${_fmt(duration)}';

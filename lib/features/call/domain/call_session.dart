@@ -31,6 +31,7 @@ class CallSession {
     this.answeredAt,
     this.endedAt,
     this.endDetail,
+    this.missed = false,
   });
 
   final String id;
@@ -49,8 +50,15 @@ class CallSession {
   /// Lý do kết thúc/thất bại bằng tiếng Việt.
   final String? endDetail;
 
+  /// Cuộc gọi đến mà mình chưa kịp nghe và bên gọi đã gác máy.
+  final bool missed;
+
   bool get isTerminal => phase == CallPhase.ended || phase == CallPhase.failed;
   bool get isActive => phase == CallPhase.active;
+
+  /// Cuộc gọi đến đang đổ chuông, chờ mình trả lời hoặc từ chối.
+  bool get isIncomingRinging =>
+      direction == CallDirection.incoming && phase == CallPhase.ringing;
 
   /// Thời lượng đàm thoại (chỉ tính từ lúc nghe máy).
   Duration? durationAt(DateTime now) {
@@ -67,6 +75,7 @@ class CallSession {
     DateTime? answeredAt,
     DateTime? endedAt,
     String? endDetail,
+    bool? missed,
   }) => CallSession(
     id: id,
     remoteNumber: remoteNumber,
@@ -79,6 +88,7 @@ class CallSession {
     answeredAt: answeredAt ?? this.answeredAt,
     endedAt: endedAt ?? this.endedAt,
     endDetail: endDetail ?? this.endDetail,
+    missed: missed ?? this.missed,
   );
 }
 

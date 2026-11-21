@@ -12,6 +12,7 @@ import 'package:voip_freefbx_app/core/permissions/permission_service.dart';
 import 'package:voip_freefbx_app/features/auth/data/odoo_auth_repository.dart';
 import 'package:voip_freefbx_app/features/auth/domain/auth_session.dart';
 import 'package:voip_freefbx_app/features/call/data/call_state_mapper.dart';
+import 'package:voip_freefbx_app/features/call/data/ringtone.dart';
 import 'package:voip_freefbx_app/features/call/domain/call_session.dart';
 import 'package:voip_freefbx_app/features/sip/data/sip_ua_client.dart';
 import 'package:voip_freefbx_app/features/sip/data/voip_config_repository.dart';
@@ -150,6 +151,81 @@ void main() {
     });
   });
 
+  group('cuộc gọi đến', () {
+    const incoming = CallSession(
+      id: 'in1',
+      remoteNumber: '1096',
+      remoteName: 'Tư vấn viên B',
+      direction: CallDirection.incoming,
+      phase: CallPhase.ringing,
+    );
+
+    test('đang đổ chuông thì chờ mình trả lời', () {
+      expect(incoming.isIncomingRinging, isTrue);
+      // PROGRESS không được đổi trạng thái của cuộc gọi đến.
+      final s = applyCallState(incoming, _ev(CallStateEnum.PROGRESS), now: _t0);
+      expect(s.isIncomingRinging, isTrue);
+    });
+
+    test(
+      'trả lời → đang đàm thoại, rồi kết thúc bình thường (không phải nhỡ)',
+      () {
+        var s = applyCallState(incoming, _ev(CallStateEnum.ACCEPTED), now: _t0);
+        expect(s.phase, CallPhase.active);
+        s = applyCallState(
+          s,
+          CallState(CallStateEnum.ENDED, originator: Originator.remote),
+          now: _t0.add(const Duration(seconds: 30)),
+        );
+        expect(s.phase, CallPhase.ended);
+        expect(s.missed, isFalse);
+      },
+    );
+
+    test('bên gọi gác máy khi mình chưa nghe → cuộc gọi nhỡ', () {
+      final s = applyCallState(
+        incoming,
+        CallState(
+          CallStateEnum.FAILED,
+          originator: Originator.remote,
+          cause: _cause(487, 'Canceled'),
+        ),
+        now: _t0,
+      );
+      expect(s.phase, CallPhase.ended);
+      expect(s.missed, isTrue);
+      expect(s.endDetail, 'Cuộc gọi nhỡ');
+    });
+
+    test('mình từ chối → không tính là nhỡ', () {
+      final s = applyCallState(
+        incoming,
+        CallState(
+          CallStateEnum.FAILED,
+          originator: Originator.local,
+          cause: _cause(486, 'Busy Here'),
+        ),
+        now: _t0,
+      );
+      expect(s.missed, isFalse);
+      expect(s.endDetail, 'Đã từ chối cuộc gọi');
+    });
+
+    test('người khác trong nhóm đã nghe máy → không tính là nhỡ', () {
+      final s = applyCallState(
+        incoming,
+        CallState(
+          CallStateEnum.FAILED,
+          originator: Originator.remote,
+          cause: _cause(487, 'Call completed elsewhere'),
+        ),
+        now: _t0,
+      );
+      expect(s.missed, isFalse);
+      expect(s.endDetail, 'Đã được máy khác trả lời');
+    });
+  });
+
   test('describeCallEnd: các mã thường gặp', () {
     expect(describeCallEnd(404, null), 'Số không tồn tại');
     expect(describeCallEnd(603, null), contains('từ chối'));
@@ -171,34 +247,38 @@ void main() {
       displayName: 'A',
     );
 
-    Widget app(FakeSipClient sip, {FakePermissionService? perms}) =>
-        ProviderScope(
-          overrides: [
-            appConfigProvider.overrideWithValue(
-              const AppConfig(
-                env: AppEnv.dev,
-                defaultOdooUrl: '',
-                defaultDatabase: '',
-                allowBadCertificate: false,
-              ),
-            ),
-            authRepositoryProvider.overrideWithValue(
-              FakeAuthRepository(restored: session),
-            ),
-            voipConfigRepositoryProvider.overrideWithValue(
-              FakeVoipConfigRepository(config: sampleConfig()),
-            ),
-            sipClientProvider.overrideWithValue(sip),
-            callServiceProvider.overrideWithValue(sip),
-            permissionServiceProvider.overrideWithValue(
-              perms ?? FakePermissionService(),
-            ),
-            permissionStatusesProvider.overrideWith(
-              (ref) => (perms ?? FakePermissionService()).statuses(),
-            ),
-          ],
-          child: const App(),
-        );
+    Widget app(
+      FakeSipClient sip, {
+      FakePermissionService? perms,
+      FakeRingtone? ringtone,
+    }) => ProviderScope(
+      overrides: [
+        ringtoneProvider.overrideWithValue(ringtone ?? FakeRingtone()),
+        appConfigProvider.overrideWithValue(
+          const AppConfig(
+            env: AppEnv.dev,
+            defaultOdooUrl: '',
+            defaultDatabase: '',
+            allowBadCertificate: false,
+          ),
+        ),
+        authRepositoryProvider.overrideWithValue(
+          FakeAuthRepository(restored: session),
+        ),
+        voipConfigRepositoryProvider.overrideWithValue(
+          FakeVoipConfigRepository(config: sampleConfig()),
+        ),
+        sipClientProvider.overrideWithValue(sip),
+        callServiceProvider.overrideWithValue(sip),
+        permissionServiceProvider.overrideWithValue(
+          perms ?? FakePermissionService(),
+        ),
+        permissionStatusesProvider.overrideWith(
+          (ref) => (perms ?? FakePermissionService()).statuses(),
+        ),
+      ],
+      child: const App(),
+    );
 
     // Sự kiện đi qua Stream nên cần hai lần pump (một để nhận sự kiện, một để dựng lại).
     // Không dùng pumpAndSettle khi đang đàm thoại vì đồng hồ chạy mỗi giây.
@@ -349,6 +429,137 @@ void main() {
       expect(find.textContaining('Cần cấp quyền micro'), findsOneWidget);
       expect(sip.dialed, isEmpty);
     });
+
+    const incomingCall = CallSession(
+      id: 'in1',
+      remoteNumber: '1096',
+      remoteName: 'Tư vấn viên B',
+      direction: CallDirection.incoming,
+      phase: CallPhase.ringing,
+    );
+
+    Future<FakeSipClient> pumpRegistered(
+      WidgetTester tester, {
+      FakePermissionService? perms,
+      FakeRingtone? ringtone,
+    }) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final sip = FakeSipClient();
+      await tester.pumpWidget(app(sip, perms: perms, ringtone: ringtone));
+      await tester.pumpAndSettle();
+      sip.push(const SipStatus.registered());
+      await tester.pumpAndSettle();
+      return sip;
+    }
+
+    testWidgets(
+      'có cuộc gọi đến: hiện màn hình, đổ chuông, trả lời, kết thúc',
+      (tester) async {
+        final ringtone = FakeRingtone();
+        final sip = await pumpRegistered(tester, ringtone: ringtone);
+
+        sip.pushCall(incomingCall);
+        await tester.pumpAndSettle();
+
+        expect(find.text('Tư vấn viên B'), findsOneWidget);
+        expect(find.text('1096'), findsOneWidget);
+        expect(find.text('Cuộc gọi đến…'), findsOneWidget);
+        expect(find.byTooltip('Trả lời'), findsOneWidget);
+        expect(find.byTooltip('Từ chối'), findsOneWidget);
+        expect(find.byTooltip('Tắt tiếng'), findsNothing);
+        expect(ringtone.ringing, isTrue);
+
+        await tester.tap(find.byTooltip('Trả lời'));
+        await flush(tester);
+        expect(sip.answers, 1);
+        expect(
+          ringtone.ringing,
+          isFalse,
+          reason: 'trả lời xong phải tắt chuông',
+        );
+        expect(find.byTooltip('Tắt tiếng'), findsOneWidget);
+        expect(find.byTooltip('Trả lời'), findsNothing);
+
+        await tester.tap(find.byTooltip('Kết thúc'));
+        await flush(tester);
+        expect(sip.hangups, 1);
+
+        await tester.pump(const Duration(seconds: 3));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('call-status')), findsNothing);
+      },
+    );
+
+    testWidgets('từ chối cuộc gọi đến: tắt chuông, hiện kết quả rồi đóng', (
+      tester,
+    ) async {
+      final ringtone = FakeRingtone();
+      final sip = await pumpRegistered(tester, ringtone: ringtone);
+
+      sip.pushCall(incomingCall);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Từ chối'));
+      await tester.pumpAndSettle();
+
+      expect(sip.rejects, 1);
+      expect(sip.answers, 0);
+      expect(ringtone.ringing, isFalse);
+      expect(find.text('Đã từ chối cuộc gọi'), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+      expect(find.text('Đã từ chối cuộc gọi'), findsNothing);
+    });
+
+    testWidgets(
+      'bên gọi gác máy trước khi nghe: tắt chuông, báo cuộc gọi nhỡ',
+      (tester) async {
+        final ringtone = FakeRingtone();
+        final sip = await pumpRegistered(tester, ringtone: ringtone);
+
+        sip.pushCall(incomingCall);
+        await tester.pumpAndSettle();
+        expect(ringtone.ringing, isTrue);
+
+        sip.pushCall(
+          incomingCall.copyWith(
+            phase: CallPhase.ended,
+            endedAt: DateTime.now(),
+            endDetail: 'Cuộc gọi nhỡ',
+            missed: true,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(ringtone.ringing, isFalse);
+        expect(find.text('Cuộc gọi nhỡ'), findsOneWidget);
+        expect(find.byTooltip('Trả lời'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'trả lời khi chưa có quyền micro: từ chối cuộc gọi và báo lỗi',
+      (tester) async {
+        final sip = await pumpRegistered(
+          tester,
+          perms: FakePermissionService(micGranted: false),
+        );
+
+        sip.pushCall(incomingCall);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip('Trả lời'));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.textContaining('Cần cấp quyền micro để nghe máy'),
+          findsOneWidget,
+        );
+        expect(sip.answers, 0);
+        expect(sip.rejects, 1);
+      },
+    );
   });
 }
 

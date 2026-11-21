@@ -43,6 +43,7 @@ dependencies:
   flutter_webrtc: ^1.6.3
   package_info_plus: ^10.2.2
   logger: ^2.8.0
+  flutter_ringtone_player: ^4.0.0+4
 
 dev_dependencies:
   flutter_test:

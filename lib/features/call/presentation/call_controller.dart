@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/permissions/permission_service.dart';
 import '../../sip/data/sip_ua_client.dart';
+import '../data/ringtone.dart';
 import '../domain/call_service.dart';
 import '../domain/call_session.dart';
 
@@ -24,13 +25,27 @@ class CallController extends Notifier<CallSession?> {
     ref.onDispose(() {
       sub.cancel();
       _linger?.cancel();
+      _setRinging(false);
     });
-    return service.currentCall;
+    final initial = service.currentCall;
+    _setRinging(initial?.isIncomingRinging ?? false);
+    return initial;
+  }
+
+  bool _ringing = false;
+
+  /// Chỉ đổ chuông khi có cuộc gọi đến đang chờ trả lời.
+  void _setRinging(bool ring) {
+    if (ring == _ringing) return;
+    _ringing = ring;
+    final ringtone = ref.read(ringtoneProvider);
+    ring ? ringtone.start() : ringtone.stop();
   }
 
   void _onSession(CallSession? session) {
     _linger?.cancel();
     state = session;
+    _setRinging(session?.isIncomingRinging ?? false);
     if (session != null && session.isTerminal) {
       _linger = Timer(lingerAfterEnd, () => state = null);
     }
@@ -55,6 +70,27 @@ class CallController extends Notifier<CallSession?> {
       );
     }
     await _service.dial(number);
+  }
+
+  /// Trả lời cuộc gọi đến (cần quyền micro).
+  Future<void> answer() async {
+    final granted = await ref
+        .read(permissionServiceProvider)
+        .ensureMicrophone();
+    if (!granted) {
+      // Không có micro thì nhấc máy cũng vô ích: từ chối để người gọi không chờ mãi.
+      await _service.reject();
+      throw const CallException(
+        'Cần cấp quyền micro để nghe máy. Vào Cài đặt > Ứng dụng > EAUT VoIP > Quyền.',
+      );
+    }
+    _setRinging(false);
+    await _service.answer();
+  }
+
+  Future<void> reject() async {
+    _setRinging(false);
+    await _service.reject();
   }
 
   Future<void> hangup() => _service.hangup();
