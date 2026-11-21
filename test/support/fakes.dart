@@ -6,6 +6,7 @@ import 'dart:async';
 
 import 'package:permission_handler/permission_handler.dart';
 import 'package:voip_freefbx_app/core/permissions/permission_service.dart';
+import 'package:voip_freefbx_app/features/call/data/ringtone.dart';
 import 'package:voip_freefbx_app/features/call/domain/call_service.dart';
 import 'package:voip_freefbx_app/features/call/domain/call_session.dart';
 import 'package:voip_freefbx_app/features/sip/data/voip_config_repository.dart';
@@ -159,6 +160,29 @@ class FakeSipClient implements SipClient, CallService {
     );
   }
 
+  int answers = 0;
+  int rejects = 0;
+
+  @override
+  Future<void> answer() async {
+    answers++;
+    pushCall(
+      _call!.copyWith(phase: CallPhase.active, answeredAt: DateTime.now()),
+    );
+  }
+
+  @override
+  Future<void> reject() async {
+    rejects++;
+    pushCall(
+      _call!.copyWith(
+        phase: CallPhase.ended,
+        endedAt: DateTime.now(),
+        endDetail: 'Đã từ chối cuộc gọi',
+      ),
+    );
+  }
+
   @override
   Future<void> hangup() async {
     hangups++;
@@ -206,4 +230,16 @@ class FakePermissionService implements PermissionService {
         : PermissionStatus.denied,
     AppPermission.notifications: PermissionStatus.granted,
   };
+}
+
+class FakeRingtone implements Ringtone {
+  int starts = 0;
+  int stops = 0;
+  bool get ringing => starts > stops;
+
+  @override
+  Future<void> start() async => starts++;
+
+  @override
+  Future<void> stop() async => stops++;
 }

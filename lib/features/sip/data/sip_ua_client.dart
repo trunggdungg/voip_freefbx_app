@@ -165,6 +165,26 @@ class SipUaClient implements SipClient, CallService, SipUaHelperListener {
   }
 
   @override
+  Future<void> answer() async {
+    final call = _call;
+    final session = _session;
+    if (call == null || session == null || !session.isIncomingRinging) {
+      throw const CallException('Không có cuộc gọi đến để trả lời.');
+    }
+    // Cuộc gọi thoại: chỉ xin âm thanh, không xin camera.
+    call.answer(_helper.buildCallOptions(true));
+  }
+
+  @override
+  Future<void> reject() async {
+    final call = _call;
+    final session = _session;
+    if (call == null || session == null || !session.isIncomingRinging) return;
+    // 486 (không phải 603): nếu cuộc gọi đang đổ chuông cả nhóm thì máy khác vẫn đổ.
+    call.hangup({'status_code': 486, 'reason_phrase': 'Busy Here'});
+  }
+
+  @override
   Future<void> hangup() async {
     final call = _call;
     if (call == null) {
@@ -179,6 +199,10 @@ class SipUaClient implements SipClient, CallService, SipUaHelperListener {
           ),
         );
       }
+      return;
+    }
+    if (_session?.isIncomingRinging ?? false) {
+      await reject();
       return;
     }
     call.hangup();
@@ -232,24 +256,11 @@ class SipUaClient implements SipClient, CallService, SipUaHelperListener {
 
   @override
   void callStateChanged(Call call, CallState state) {
-    // M4 sẽ xử lý cuộc gọi đến. Hiện chỉ theo dõi cuộc gọi đi.
-    if (call.direction != Direction.outgoing) return;
-
-    var session = _session;
     if (state.state == CallStateEnum.CALL_INITIATION) {
-      // Gắn phiên SIP vào cuộc gọi đang chờ ở dial().
-      if (session == null || session.isTerminal) return;
-      _call = call;
-      _emitCall(
-        CallSession(
-          id: call.id ?? session.id,
-          remoteNumber: session.remoteNumber,
-          direction: CallDirection.outgoing,
-          speakerOn: session.speakerOn,
-        ),
-      );
+      _onNewCall(call);
       return;
     }
+    final session = _session;
     if (session == null || _call?.id != call.id) return;
 
     final next = applyCallState(session, state, now: DateTime.now());
@@ -259,6 +270,43 @@ class SipUaClient implements SipClient, CallService, SipUaHelperListener {
       unawaited(_resetSpeaker());
     }
     if (!identical(next, session)) _emitCall(next);
+  }
+
+  void _onNewCall(Call call) {
+    final session = _session;
+    final busy = session != null && !session.isTerminal;
+
+    if (call.direction == Direction.incoming) {
+      if (busy) {
+        // Đang có cuộc gọi khác: báo bận cho người gọi, không làm phiền người dùng.
+        call.hangup({'status_code': 486, 'reason_phrase': 'Busy Here'});
+        return;
+      }
+      _call = call;
+      final name = call.remote_display_name;
+      _emitCall(
+        CallSession(
+          id: call.id ?? 'in-${DateTime.now().microsecondsSinceEpoch}',
+          remoteNumber: call.remote_identity ?? '',
+          remoteName: (name == null || name.isEmpty) ? null : name,
+          direction: CallDirection.incoming,
+          phase: CallPhase.ringing,
+        ),
+      );
+      return;
+    }
+
+    // Cuộc gọi đi: gắn phiên SIP vào cuộc gọi đang chờ ở dial().
+    if (session == null || session.isTerminal) return;
+    _call = call;
+    _emitCall(
+      CallSession(
+        id: call.id ?? session.id,
+        remoteNumber: session.remoteNumber,
+        direction: CallDirection.outgoing,
+        speakerOn: session.speakerOn,
+      ),
+    );
   }
 
   @override

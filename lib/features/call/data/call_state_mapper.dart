@@ -35,24 +35,9 @@ CallSession applyCallState(
     case CallStateEnum.UNMUTED:
       return event.audio == true ? current.copyWith(muted: false) : current;
     case CallStateEnum.FAILED:
-      final code = event.cause?.status_code;
-      final reason = event.cause?.reason_phrase ?? event.cause?.cause;
-      // Mình hủy khi đang đổ chuông không phải là "thất bại".
-      final cancelled = code == 487 || reason == 'Canceled';
-      return current.copyWith(
-        phase: cancelled ? CallPhase.ended : CallPhase.failed,
-        endedAt: now,
-        endDetail: describeCallEnd(code, reason),
-      );
+      return _terminal(current, event, now, failed: true);
     case CallStateEnum.ENDED:
-      return current.copyWith(
-        phase: CallPhase.ended,
-        endedAt: now,
-        endDetail: describeCallEnd(
-          event.cause?.status_code,
-          event.cause?.reason_phrase ?? event.cause?.cause,
-        ),
-      );
+      return _terminal(current, event, now, failed: false);
     case CallStateEnum.NONE:
     case CallStateEnum.STREAM:
     case CallStateEnum.CONNECTING:
@@ -109,4 +94,58 @@ String describeCallEnd(int? code, String? reason) {
       return 'Cuộc gọi kết thúc';
   }
   return 'Cuộc gọi kết thúc ($reason${code == null ? '' : ', mã $code'})';
+}
+
+CallSession _terminal(
+  CallSession current,
+  CallState event,
+  DateTime now, {
+  required bool failed,
+}) {
+  final code = event.cause?.status_code;
+  final reason = event.cause?.reason_phrase ?? event.cause?.cause;
+
+  // Cuộc gọi đến mà mình chưa nghe máy.
+  if (current.direction == CallDirection.incoming &&
+      current.answeredAt == null) {
+    final lower = (reason ?? '').toLowerCase();
+    // FreePBX báo "Call completed elsewhere" khi người khác trong nhóm đã nghe máy.
+    if (lower.contains('elsewhere') || lower.contains('cause=200')) {
+      return current.copyWith(
+        phase: CallPhase.ended,
+        endedAt: now,
+        endDetail: 'Đã được máy khác trả lời',
+      );
+    }
+    // Chính mình từ chối.
+    if (event.originator == Originator.local) {
+      return current.copyWith(
+        phase: CallPhase.ended,
+        endedAt: now,
+        endDetail: 'Đã từ chối cuộc gọi',
+      );
+    }
+    // Bên gọi gác máy (hoặc hết giờ chờ) khi mình chưa kịp nghe: cuộc gọi nhỡ.
+    return current.copyWith(
+      phase: CallPhase.ended,
+      endedAt: now,
+      endDetail: 'Cuộc gọi nhỡ',
+      missed: true,
+    );
+  }
+
+  if (failed) {
+    // Mình hủy khi đang đổ chuông không phải là "thất bại".
+    final cancelled = code == 487 || reason == 'Canceled';
+    return current.copyWith(
+      phase: cancelled ? CallPhase.ended : CallPhase.failed,
+      endedAt: now,
+      endDetail: describeCallEnd(code, reason),
+    );
+  }
+  return current.copyWith(
+    phase: CallPhase.ended,
+    endedAt: now,
+    endDetail: describeCallEnd(code, reason),
+  );
 }

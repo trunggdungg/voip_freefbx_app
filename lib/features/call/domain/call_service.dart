@@ -9,6 +9,13 @@ abstract class CallService {
   /// Gọi đi. Ném [CallException] nếu chưa đăng ký hoặc đang có cuộc gọi khác.
   Future<void> dial(String number);
 
+  /// Trả lời cuộc gọi đến đang đổ chuông.
+  Future<void> answer();
+
+  /// Từ chối cuộc gọi đến đang đổ chuông.
+  Future<void> reject();
+
+  /// Kết thúc cuộc gọi (với cuộc gọi đến đang đổ chuông thì là từ chối).
   Future<void> hangup();
   Future<void> setMuted(bool muted);
   Future<void> setHeld(bool held);

@@ -3,13 +3,19 @@
 App Android gọi VoIP cho tư vấn tuyển sinh: đăng nhập bằng tài khoản Odoo, lấy cấu hình SIP
 từ Odoo (module `voip_webrtc_freepbx`) và đăng ký extension qua WSS tới FreePBX.
 
-Tiến độ: **M0** khung dự án ✔ · **M1** đăng nhập Odoo + lấy cấu hình SIP ✔ · **M2** đăng ký SIP qua WSS ✔ · **M3** gọi đi ✔ · M4 nhận cuộc gọi (tiếp theo).
+Tiến độ: **M0** khung dự án ✔ · **M1** đăng nhập Odoo + lấy cấu hình SIP ✔ · **M2** đăng ký SIP qua WSS ✔ · **M3** gọi đi ✔ · **M4** nhận cuộc gọi khi app mở ✔ · M5 lịch sử cuộc gọi (tiếp theo).
 
 ## Gọi đi (M3)
 Nút **Bàn phím** ở trang chính mở bàn phím số (giữ phím `0` để nhập `+`; mã tính năng như `*43` gọi được).
 Chỉ gọi được khi đã **Đăng ký**. Màn hình cuộc gọi có: tắt tiếng, loa ngoài, giữ máy, bàn phím DTMF,
 kết thúc; hiện thời lượng và lý do khi thất bại (máy bận, sai số, bị từ chối...). Cần quyền micro.
-Chưa xử lý cuộc gọi đến (M4): có người gọi vào thì app chưa đổ chuông.
+
+## Nhận cuộc gọi (M4)
+Khi app đang mở và đã đăng ký, có người gọi vào thì app đổ chuông (nhạc chuông hệ thống) và mở màn hình
+**Cuộc gọi đến** với nút Trả lời / Từ chối. Đang có cuộc gọi khác thì báo bận cho người gọi. Bên gọi gác
+máy khi chưa nghe được đánh dấu **Cuộc gọi nhỡ**; người khác trong nhóm đã nghe thì hiện "Đã được máy khác
+trả lời". Từ chối trả mã SIP 486 (để máy khác trong nhóm vẫn đổ chuông).
+**Chưa** nhận được cuộc gọi khi app chạy nền hoặc bị tắt (push FCM nằm ở giai đoạn sau).
 
 ## Đăng ký SIP (M2)
 Sau khi lấy cấu hình, app mở WebSocket tới FreePBX và đăng ký `sip:<extension>@<realm>` giống
