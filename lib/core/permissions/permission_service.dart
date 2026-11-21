@@ -25,6 +25,13 @@ class PermissionService {
     return {for (final p in AppPermission.values) p: await p.permission.status};
   }
 
+  /// Có quyền micro chưa; chưa thì xin. Trả về true nếu được cấp.
+  Future<bool> ensureMicrophone() async {
+    final status = await AppPermission.microphone.permission.status;
+    if (status.isGranted) return true;
+    return (await request(AppPermission.microphone)).isGranted;
+  }
+
   /// Xin quyền. Nếu người dùng đã chọn "không hỏi lại" thì mở màn hình cài đặt app.
   Future<PermissionStatus> request(AppPermission p) async {
     final current = await p.permission.status;

@@ -4,6 +4,10 @@ import 'package:voip_freefbx_app/features/auth/domain/auth_repository.dart';
 import 'package:voip_freefbx_app/features/auth/domain/auth_session.dart';
 import 'dart:async';
 
+import 'package:permission_handler/permission_handler.dart';
+import 'package:voip_freefbx_app/core/permissions/permission_service.dart';
+import 'package:voip_freefbx_app/features/call/domain/call_service.dart';
+import 'package:voip_freefbx_app/features/call/domain/call_session.dart';
 import 'package:voip_freefbx_app/features/sip/data/voip_config_repository.dart';
 import 'package:voip_freefbx_app/features/sip/domain/sip_client.dart';
 import 'package:voip_freefbx_app/features/sip/domain/sip_status.dart';
@@ -86,8 +90,8 @@ VoipConfig sampleConfig({String wss = 'wss://pbx.example.com:8089/ws'}) =>
       ),
     );
 
-/// SipClient giả: ghi lại các lần start/stop, cho test đẩy trạng thái vào.
-class FakeSipClient implements SipClient {
+/// SipClient + CallService giả: ghi lại thao tác, cho test đẩy trạng thái vào.
+class FakeSipClient implements SipClient, CallService {
   final _controller = StreamController<SipStatus>.broadcast();
   SipStatus _status = const SipStatus.stopped();
   final List<String> startedUsers = [];
@@ -117,5 +121,89 @@ class FakeSipClient implements SipClient {
   }
 
   @override
-  Future<void> dispose() async => _controller.close();
+  Future<void> dispose() async {
+    await _controller.close();
+    await _callController.close();
+  }
+
+  // ---- CallService ----
+  final _callController = StreamController<CallSession?>.broadcast();
+  CallSession? _call;
+  final List<String> dialed = [];
+  final List<String> dtmf = [];
+  int hangups = 0;
+
+  @override
+  CallSession? get currentCall => _call;
+
+  @override
+  Stream<CallSession?> get callStream => _callController.stream;
+
+  void pushCall(CallSession? s) {
+    _call = s;
+    _callController.add(s);
+  }
+
+  @override
+  Future<void> dial(String number) async {
+    if (!_status.isRegistered) {
+      throw const CallException('Chưa đăng ký với tổng đài, chưa thể gọi.');
+    }
+    dialed.add(number);
+    pushCall(
+      CallSession(
+        id: 'c${dialed.length}',
+        remoteNumber: number,
+        direction: CallDirection.outgoing,
+      ),
+    );
+  }
+
+  @override
+  Future<void> hangup() async {
+    hangups++;
+    pushCall(
+      _call!.copyWith(
+        phase: CallPhase.ended,
+        endedAt: DateTime.now(),
+        endDetail: 'Đã hủy cuộc gọi',
+      ),
+    );
+  }
+
+  @override
+  Future<void> setMuted(bool muted) async =>
+      pushCall(_call!.copyWith(muted: muted));
+
+  @override
+  Future<void> setHeld(bool held) async =>
+      pushCall(_call!.copyWith(held: held));
+
+  @override
+  Future<void> setSpeaker(bool on) async =>
+      pushCall(_call!.copyWith(speakerOn: on));
+
+  @override
+  void sendDtmf(String tone) => dtmf.add(tone);
+}
+
+class FakePermissionService implements PermissionService {
+  FakePermissionService({this.micGranted = true});
+
+  bool micGranted;
+
+  @override
+  Future<bool> ensureMicrophone() async => micGranted;
+
+  @override
+  Future<PermissionStatus> request(AppPermission p) async =>
+      micGranted ? PermissionStatus.granted : PermissionStatus.denied;
+
+  @override
+  Future<Map<AppPermission, PermissionStatus>> statuses() async => {
+    AppPermission.microphone: micGranted
+        ? PermissionStatus.granted
+        : PermissionStatus.denied,
+    AppPermission.notifications: PermissionStatus.granted,
+  };
 }
