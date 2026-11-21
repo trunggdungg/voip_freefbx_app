@@ -4,4 +4,7 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Chỉ bản debug: cho phép gọi Odoo qua http:// trong mạng LAN khi phát triển.
+         Bản release giữ mặc định (bắt buộc HTTPS). -->
+    <application android:usesCleartextTraffic="true"/>
 </manifest>

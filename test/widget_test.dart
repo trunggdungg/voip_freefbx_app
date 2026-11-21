@@ -1,30 +1,45 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:voip_freefbx_app/main.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:voip_freefbx_app/app.dart';
+import 'package:voip_freefbx_app/core/config/app_config.dart';
+import 'package:voip_freefbx_app/core/config/app_config_provider.dart';
+import 'package:voip_freefbx_app/core/permissions/permission_service.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('Màn hình M0 hiện môi trường và trạng thái quyền', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appConfigProvider.overrideWithValue(const AppConfig(
+            env: AppEnv.dev,
+            defaultOdooUrl: 'http://192.168.1.10:8069',
+            defaultDatabase: 'odoo',
+            allowBadCertificate: true,
+          )),
+          permissionStatusesProvider.overrideWith(
+            (ref) async => {
+              AppPermission.microphone: PermissionStatus.granted,
+              AppPermission.notifications: PermissionStatus.denied,
+            },
+          ),
+        ],
+        child: const App(),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    expect(find.text('EAUT VoIP'), findsOneWidget);
+    expect(find.text('Môi trường: dev'), findsOneWidget);
+    expect(find.text('http://192.168.1.10:8069'), findsOneWidget);
+    expect(find.text('Micro'), findsOneWidget);
+    // Micro đã cấp thì không có nút; Thông báo chưa cấp thì có nút "Cấp quyền".
+    expect(find.text('Cấp quyền'), findsOneWidget);
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  test('AppConfig mặc định là dev và không bật chứng chỉ lỏng', () {
+    final config = AppConfig.fromEnvironment();
+    expect(config.env, AppEnv.dev);
+    expect(config.allowBadCertificate, isFalse);
   });
 }

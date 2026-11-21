@@ -1,0 +1,6 @@
+{
+  "APP_ENV": "prod",
+  "ODOO_URL": "https://odoo.example.com",
+  "ODOO_DB": "",
+  "ALLOW_BAD_CERT": "false"
+}
