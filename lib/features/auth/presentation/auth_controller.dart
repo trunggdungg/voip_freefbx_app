@@ -15,7 +15,9 @@ class AuthController extends AsyncNotifier<AuthSession?> {
     required String login,
     required String password,
   }) async {
-    final session = await ref.read(authRepositoryProvider).login(
+    final session = await ref
+        .read(authRepositoryProvider)
+        .login(
           baseUrl: baseUrl,
           database: database,
           login: login,

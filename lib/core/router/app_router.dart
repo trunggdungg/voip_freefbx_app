@@ -24,7 +24,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final auth = ref.read(authControllerProvider);
       final at = state.matchedLocation;
-      if (auth.isLoading) return at == AppRoutes.splash ? null : AppRoutes.splash;
+      if (auth.isLoading) {
+        return at == AppRoutes.splash ? null : AppRoutes.splash;
+      }
       final loggedIn = auth.value != null;
       if (!loggedIn) return at == AppRoutes.login ? null : AppRoutes.login;
       return (at == AppRoutes.login || at == AppRoutes.splash)

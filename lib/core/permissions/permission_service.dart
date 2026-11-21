@@ -22,9 +22,7 @@ class PermissionService {
   const PermissionService();
 
   Future<Map<AppPermission, PermissionStatus>> statuses() async {
-    return {
-      for (final p in AppPermission.values) p: await p.permission.status,
-    };
+    return {for (final p in AppPermission.values) p: await p.permission.status};
   }
 
   /// Xin quyền. Nếu người dùng đã chọn "không hỏi lại" thì mở màn hình cài đặt app.
@@ -44,5 +42,5 @@ final permissionServiceProvider = Provider<PermissionService>(
 
 final permissionStatusesProvider =
     FutureProvider.autoDispose<Map<AppPermission, PermissionStatus>>(
-  (ref) => ref.watch(permissionServiceProvider).statuses(),
-);
+      (ref) => ref.watch(permissionServiceProvider).statuses(),
+    );

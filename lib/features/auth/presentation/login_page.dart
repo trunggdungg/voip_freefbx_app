@@ -58,7 +58,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       _error = null;
     });
     try {
-      await ref.read(authControllerProvider.notifier).login(
+      await ref
+          .read(authControllerProvider.notifier)
+          .login(
             baseUrl: baseUrl,
             database: _db.text.trim(),
             login: _login.text.trim(),
@@ -89,16 +91,23 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Icon(Icons.phone_in_talk,
-                        size: 56, color: theme.colorScheme.primary),
+                    Icon(
+                      Icons.phone_in_talk,
+                      size: 56,
+                      color: theme.colorScheme.primary,
+                    ),
                     const SizedBox(height: 12),
-                    Text('EAUT VoIP',
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.headlineMedium),
+                    Text(
+                      'EAUT VoIP',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.headlineMedium,
+                    ),
                     const SizedBox(height: 4),
-                    Text('Đăng nhập bằng tài khoản Odoo',
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodyMedium),
+                    Text(
+                      'Đăng nhập bằng tài khoản Odoo',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium,
+                    ),
                     const SizedBox(height: 24),
                     TextFormField(
                       controller: _url,
@@ -161,9 +170,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         border: const OutlineInputBorder(),
                         suffixIcon: IconButton(
                           tooltip: _obscure ? 'Hiện mật khẩu' : 'Ẩn mật khẩu',
-                          icon: Icon(_obscure
-                              ? Icons.visibility
-                              : Icons.visibility_off),
+                          icon: Icon(
+                            _obscure ? Icons.visibility : Icons.visibility_off,
+                          ),
                           onPressed: () => setState(() => _obscure = !_obscure),
                         ),
                       ),

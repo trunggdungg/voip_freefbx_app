@@ -3,7 +3,13 @@
 App Android gọi VoIP cho tư vấn tuyển sinh: đăng nhập bằng tài khoản Odoo, lấy cấu hình SIP
 từ Odoo (module `voip_webrtc_freepbx`) và đăng ký extension qua WSS tới FreePBX.
 
-Tiến độ: **M0** khung dự án ✔ · **M1** đăng nhập Odoo + lấy cấu hình SIP ✔ · M2 đăng ký SIP (tiếp theo).
+Tiến độ: **M0** khung dự án ✔ · **M1** đăng nhập Odoo + lấy cấu hình SIP ✔ · **M2** đăng ký SIP qua WSS ✔ · M3 gọi đi (tiếp theo).
+
+## Đăng ký SIP (M2)
+Sau khi lấy cấu hình, app mở WebSocket tới FreePBX và đăng ký `sip:<extension>@<realm>` giống
+softphone web. Trạng thái hiển thị trên trang chính (Đang kết nối / Đã đăng ký / Mất kết nối / Lỗi).
+Đăng xuất thì hủy đăng ký. **Một extension chỉ nên đăng ký ở một nơi**: khi test, đóng web softphone
+của cùng user.
 
 ## Đăng nhập (M1)
 App dùng endpoint sẵn có của Odoo: `POST /web/session/authenticate` (cookie `session_id`) và

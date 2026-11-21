@@ -85,10 +85,10 @@ class OdooAuthRepository implements AuthRepository {
 
   @override
   Future<LoginPrefill> lastLoginInfo() async => LoginPrefill(
-        baseUrl: await _store.read(StoreKeys.odooUrl),
-        database: await _store.read(StoreKeys.odooDb),
-        login: await _store.read(StoreKeys.odooLogin),
-      );
+    baseUrl: await _store.read(StoreKeys.odooUrl),
+    database: await _store.read(StoreKeys.odooDb),
+    login: await _store.read(StoreKeys.odooLogin),
+  );
 }
 
 final authRepositoryProvider = Provider<AuthRepository>(
