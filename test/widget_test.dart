@@ -27,9 +27,11 @@ Widget _app({
   required FakeVoipConfigRepository voip,
   FakeSipClient? sip,
 }) {
+  final fakeSip = sip ?? FakeSipClient();
   return ProviderScope(
     overrides: [
-      sipClientProvider.overrideWithValue(sip ?? FakeSipClient()),
+      sipClientProvider.overrideWithValue(fakeSip),
+      callServiceProvider.overrideWithValue(fakeSip),
       appConfigProvider.overrideWithValue(_devConfig),
       authRepositoryProvider.overrideWithValue(auth),
       voipConfigRepositoryProvider.overrideWithValue(voip),

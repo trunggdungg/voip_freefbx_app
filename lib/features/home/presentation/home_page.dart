@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/permissions/permission_service.dart';
+import '../../../core/router/app_router.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../sip/domain/sip_status.dart';
 import '../../sip/domain/voip_config.dart';
@@ -23,6 +25,12 @@ class HomePage extends ConsumerWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'home-dial',
+        onPressed: () => context.push(AppRoutes.dial),
+        icon: const Icon(Icons.dialpad),
+        label: const Text('Bàn phím'),
+      ),
       appBar: AppBar(
         title: const Text('EAUT VoIP'),
         actions: [
